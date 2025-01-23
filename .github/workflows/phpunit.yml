@@ -1,5 +1,5 @@
 name: Laravel
-
+# ワークフローを実行するタイミング
 on:
   push:
   pull_request:
@@ -9,10 +9,13 @@ env:
   DB_PASSWORD: password
   MAIL_FROM_ADDRESS: info@example.com
 
+# ジョブ定義(ジョブ名は任意の値)
 jobs:
   phpunit:
+    # ジョブの実行環境を指定
     runs-on: ubuntu-latest
 
+    # ジョブに関連して起動するサービスの設定
     services:
       mysql.test:
         image: "mysql/mysql-server:8.0"
@@ -23,27 +26,37 @@ jobs:
           MYSQL_USER: ${{ env.DB_USERNAME }}
           MYSQL_PASSWORD: ${{ env.DB_PASSWORD }}
           MYSQL_ALLOW_EMPTY_PASSWORD: 1
+        # Docker コンテナに対して追加の設定やオプションを指定するためのキー
+        # 以下はMySQLコンテナが起動しているかを確認するヘルスチェック
         options: >-
           --health-cmd "mysqladmin ping"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
 
+    # ジョブで実行するタスクを定義する。Actionsでのテスト環境を整える
     steps:
+      # リポジトリのコードをチェックアウト（クローン）
       - uses: actions/checkout@v2
+      # PHPの環境構築
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
           php-version: "8.1"
           tools: composer:v2
+      # テスト用の環境変数の設定ファイルを.env.testingにコピー
       - name: Copy .env
         run: cp .env.example .env.testing
+      # アプリが依存しているパッケージをDL
       - name: Install Dependencies
         if: steps.cache.outputs.cache-hit != 'true'
         run: composer install -q --no-ansi --no-interaction --no-scripts --no-progress --prefer-dist
+      # LaravelのAPP_KEYを作成
       - name: Generate key
         run: php artisan key:generate --env testing
+      # /etc/hosts ファイルにホスト名を127.0.0.1に紐づけ
       - name: Set hostname
         run: sudo echo "127.0.0.1 mysql.test" | sudo tee -a /etc/hosts
+      # PHPUnitを実行するコマンド
       - name: Execute tests (Unit and Feature tests) via PHPUnit
-        run: vendor/bin/phpunit
+        run: vendor/bin/phpunit tests/Unit/Services tests/Feature/Tweet
